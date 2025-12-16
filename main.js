@@ -3,7 +3,7 @@ console.log('🚗 JavaScript VERSION: 9.0 - Netlify + Google Sheets版');
 console.log('ファイル読み込み時刻:', new Date().toISOString());
 
 // ⚙️ Google Sheets Web API URL
-const GOOGLE_SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbyNpojRWZ3wdGpV3F1PHgmBpDxj7oYKyYU6Th1LZKF667O4AhcPBwo_3w6yFhzhKbcc/exec';
+const GOOGLE_SHEETS_API_URL = 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE';
 
 console.log('Google Sheets API URL:', GOOGLE_SHEETS_API_URL);
 

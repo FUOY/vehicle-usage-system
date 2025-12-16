@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>社用車利用履歴管理システム v9.0</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- バージョン確認用 -->
+    <script>
+        console.log('🚗 HTML VERSION: 9.0 - Netlify + Google Sheets版');
+        console.log('タイムスタンプ:', new Date().toISOString());
+    </script>
+    <!-- SheetJS (Excel出力用) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚗 社用車利用履歴管理システム</h1>
+            <p class="subtitle">営業部</p>
+        </header>
+
+        <main>
+            <!-- 車番タブ -->
+            <section class="tabs-section">
+                <div class="tabs-container">
+                    <button class="tab-btn active" data-vehicle="2405">2405</button>
+                    <button class="tab-btn" data-vehicle="2406">2406</button>
+                    <button class="tab-btn" data-vehicle="2407">2407</button>
+                    <button class="tab-btn" data-vehicle="2408">2408</button>
+                </div>
+            </section>
+
+            <!-- 入力フォーム -->
+            <section class="form-section">
+                <h2>利用履歴登録</h2>
+                <form id="usageForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="usage_date">使用日 <span class="required">*</span></label>
+                            <input type="date" id="usage_date" name="usage_date" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="vehicle_number">車番 <span class="required">*</span></label>
+                            <input type="text" id="vehicle_number" name="vehicle_number" required style="background-color: #e9ecef; cursor: default; font-weight: 600; font-size: 1.1rem; color: #667eea;">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="staff_name">担当者 <span class="required">*</span></label>
+                            <select id="staff_name" name="staff_name" required>
+                                <option value="">選択してください</option>
+                                <option value="永森">永森</option>
+                                <option value="箱崎">箱崎</option>
+                                <option value="清水">清水</option>
+                                <option value="杉田">杉田</option>
+                                <option value="安里">安里</option>
+                                <option value="鎌田">鎌田</option>
+                                <option value="大山">大山</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="departure_time">出発時刻 <span class="required">*</span></label>
+                            <input type="time" id="departure_time" name="departure_time" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="departure_mileage">出発時走行距離 (km) <span class="required">*</span></label>
+                            <input type="number" id="departure_mileage" name="departure_mileage" placeholder="12345" min="0" step="0.1" required>
+                            <small id="lastMileageHint"></small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="destination">目的地・客先 <span class="required">*</span></label>
+                            <input type="text" id="destination" name="destination" placeholder="○○株式会社" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="arrival_time">帰着時刻</label>
+                            <input type="time" id="arrival_time" name="arrival_time">
+                            <small>後で入力する場合は空欄のまま登録できます</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="arrival_mileage">帰着時走行距離 (km)</label>
+                            <input type="number" id="arrival_mileage" name="arrival_mileage" placeholder="12380" min="0" step="0.1">
+                            <small>後で入力する場合は空欄のまま登録できます</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="fuel_amount">給油量 (リットル)</label>
+                            <input type="number" id="fuel_amount" name="fuel_amount" placeholder="0" min="0" step="0.1" value="0">
+                            <small>給油しなかった場合は0を入力してください</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="receipt_image">給油レシート</label>
+                            <input type="file" id="receipt_image" name="receipt_image" accept="image/*">
+                            <small>画像は自動的に圧縮されます（最大500KB）</small>
+                            <div id="receiptPreview" class="receipt-preview"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">登録</button>
+                        <button type="reset" id="clearFormBtn" class="btn btn-secondary">クリア</button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- フィルター・エクスポートセクション -->
+            <section class="filter-section">
+                <h2>履歴管理</h2>
+                <div class="filter-controls">
+                    <div class="filter-group">
+                        <label for="filter_month">月選択</label>
+                        <input type="month" id="filter_month" name="filter_month">
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter_vehicle">車番</label>
+                        <select id="filter_vehicle" name="filter_vehicle">
+                            <option value="">全て</option>
+                            <option value="2405">2405</option>
+                            <option value="2406">2406</option>
+                            <option value="2407">2407</option>
+                            <option value="2408">2408</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter_staff">担当者</label>
+                        <select id="filter_staff" name="filter_staff">
+                            <option value="">全て</option>
+                            <option value="永森">永森</option>
+                            <option value="箱崎">箱崎</option>
+                            <option value="清水">清水</option>
+                            <option value="杉田">杉田</option>
+                            <option value="安里">安里</option>
+                            <option value="鎌田">鎌田</option>
+                            <option value="大山">大山</option>
+                        </select>
+                    </div>
+                    <div class="filter-actions">
+                        <button id="filterBtn" class="btn btn-info">絞込</button>
+                        <button id="resetFilterBtn" class="btn btn-secondary">リセット</button>
+                        <button id="exportExcelBtn" class="btn btn-success">📊 Excel出力</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 履歴テーブル -->
+            <section class="table-section">
+                <h2>利用履歴一覧</h2>
+                <div class="table-controls">
+                    <div class="total-info">
+                        <span id="totalRecords">総件数: 0件</span>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table id="usageTable">
+                        <thead>
+                            <tr>
+                                <th>使用日</th>
+                                <th>車番</th>
+                                <th>担当者</th>
+                                <th>出発<br>時刻</th>
+                                <th>出発時<br>走行距離</th>
+                                <th>目的地</th>
+                                <th>帰着<br>時刻</th>
+                                <th>帰着時<br>走行距離</th>
+                                <th>走行<br>距離</th>
+                                <th>給油量</th>
+                                <th>レシート</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usageTableBody">
+                            <tr class="no-data">
+                                <td colspan="12">データがありません</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination">
+                    <button id="prevPage" class="btn btn-small" disabled>前へ</button>
+                    <span id="pageInfo">1 / 1</span>
+                    <button id="nextPage" class="btn btn-small" disabled>次へ</button>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 営業部 社用車利用履歴管理システム</p>
+        </footer>
+    </div>
+
+    <!-- 編集モーダル -->
+    <div id="editModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>帰着情報の編集</h3>
+                <button id="closeEdit" class="btn-close">&times;</button>
+            </div>
+            <form id="editForm">
+                <div class="modal-body">
+                    <div class="info-display">
+                        <p><strong>使用日:</strong> <span id="edit_display_date"></span></p>
+                        <p><strong>車番:</strong> <span id="edit_display_vehicle"></span></p>
+                        <p><strong>担当者:</strong> <span id="edit_display_staff"></span></p>
+                        <p><strong>出発時刻:</strong> <span id="edit_display_departure_time"></span></p>
+                        <p><strong>出発時走行距離:</strong> <span id="edit_display_departure_mileage"></span> km</p>
+                        <p><strong>目的地:</strong> <span id="edit_display_destination"></span></p>
+                    </div>
+                    <hr style="margin: 20px 0;">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="edit_arrival_time">帰着時刻 <span class="required">*</span></label>
+                            <input type="time" id="edit_arrival_time" name="edit_arrival_time" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_arrival_mileage">帰着時走行距離 (km) <span class="required">*</span></label>
+                            <input type="number" id="edit_arrival_mileage" name="edit_arrival_mileage" min="0" step="0.1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_fuel_amount">給油量 (リットル)</label>
+                            <input type="number" id="edit_fuel_amount" name="edit_fuel_amount" placeholder="0" min="0" step="0.1" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_receipt_image">給油レシート</label>
+                            <input type="file" id="edit_receipt_image" name="edit_receipt_image" accept="image/*">
+                            <small>画像は自動的に圧縮されます（最大500KB）</small>
+                            <div id="editReceiptPreview" class="receipt-preview"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">更新</button>
+                    <button type="button" id="cancelEdit" class="btn btn-secondary">キャンセル</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 削除確認モーダル -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <h3>削除確認</h3>
+            <p>この履歴を削除してもよろしいですか？</p>
+            <div class="modal-actions">
+                <button id="confirmDelete" class="btn btn-danger">削除</button>
+                <button id="cancelDelete" class="btn btn-secondary">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- レシート画像表示モーダル -->
+    <div id="receiptModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>給油レシート</h3>
+                <button id="closeReceipt" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <img id="receiptImage" src="" alt="レシート画像">
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知 -->
+    <div id="notification" class="notification"></div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

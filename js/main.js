@@ -1,11 +1,13 @@
 // ===== バージョン確認 =====
-console.log('🚗 JavaScript VERSION: 9.3 - GitHub Pages + CORS Proxy版');
+console.log('🚗 JavaScript VERSION: 9.4 - GitHub Pages + AllOrigins Proxy版');
 console.log('ファイル読み込み時刻:', new Date().toISOString());
 
-// ⚙️ Google Sheets Web API URL（CORSプロキシ経由）
-const GOOGLE_SHEETS_API_URL = 'https://corsproxy.io/?https://script.google.com/macros/s/AKfycby7OrRmnFOm_gzKQehYCmbBybFxIU2YSTm6Pk7CFtvfVG0Y6s3a0IwYyIrEOC-tWeQA/exec';
+// ⚙️ Google Sheets Web API URL（AllOriginsプロキシ経由）
+const GOOGLE_SHEETS_API_URL = 'https://api.allorigins.win/raw?url=https://script.google.com/macros/s/AKfycby7OrRmnFOm_gzKQehYCmbBybFxIU2YSTm6Pk7CFtvfVG0Y6s3a0IwYyIrEOC-tWeQA/exec';
 
-console.log('✅ Google Sheets API URL (CORS Proxy経由):', GOOGLE_SHEETS_API_URL);
+console.log('✅ Google Sheets API URL (AllOrigins Proxy経由):', GOOGLE_SHEETS_API_URL);
+console.log('⚡ より安定したCORSプロキシを使用');
+
 console.log('⚡ CORSプロキシが有効です');
 
 

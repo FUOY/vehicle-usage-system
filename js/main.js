@@ -1,11 +1,13 @@
 // ===== バージョン確認 =====
-console.log('🚗 JavaScript VERSION: 9.0 - Netlify + Google Sheets版');
+console.log('🚗 JavaScript VERSION: 9.3 - GitHub Pages + CORS Proxy版');
 console.log('ファイル読み込み時刻:', new Date().toISOString());
 
-// ⚙️ Google Sheets Web API URL
-const GOOGLE_SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbyftihnxfpQ5ixJ4hy_b3I5op8aCAY9yT436AYN9cGUgj_70vBfr-r_JPM2ApM_szaE/exec';
+// ⚙️ Google Sheets Web API URL（CORSプロキシ経由）
+const GOOGLE_SHEETS_API_URL = 'https://corsproxy.io/?https://script.google.com/macros/s/AKfycby7OrRmnFOm_gzKQehYCmbBybFxIU2YSTm6Pk7CFtvfVG0Y6s3a0IwYyIrEOC-tWeQA/exec';
 
-console.log('Google Sheets API URL:', GOOGLE_SHEETS_API_URL);
+console.log('✅ Google Sheets API URL (CORS Proxy経由):', GOOGLE_SHEETS_API_URL);
+console.log('⚡ CORSプロキシが有効です');
+
 
 // グローバル変数
 let allRecords = [];

@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>社用車利用履歴管理システム v15.0</title>
+    <title>社用車利用履歴管理システム v16.0</title>
     <link rel="stylesheet" href="css/style.css?v=12.0">
     <!-- バージョン確認用 -->
     <script>
-        console.log('🚗 HTML VERSION: 15.0 - Supabase版（ETC料金自動計算機能追加）');
+        console.log('🚗 HTML VERSION: 17.0 - Supabase版（道路種別別IC選択対応）');
         console.log('タイムスタンプ:', new Date().toISOString());
     </script>
     <!-- SheetJS (Excel出力用) -->
@@ -16,6 +16,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- 高速道路IC・料金データベース -->
     <script src="js/highway-data.js"></script>
+    <!-- 高速道路区間管理機能 -->
+    <script src="js/highway-segments.js"></script>
 </head>
 <body>
     <div class="container">
@@ -80,36 +82,18 @@
                             <input type="text" id="destination" name="destination" placeholder="○○株式会社" required>
                         </div>
 
-                        <div class="form-group">
-                            <label for="highway_entry">高速道路入口</label>
-                            <input type="text" id="highway_entry" name="highway_entry" placeholder="例: 東京IC" list="ic_list">
-                            <small>高速道路を利用した場合のみ入力</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="highway_exit">高速道路出口</label>
-                            <input type="text" id="highway_exit" name="highway_exit" placeholder="例: 大阪IC" list="ic_list">
-                            <small>高速道路を利用した場合のみ入力</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="vehicle_class">車種区分</label>
-                            <select id="vehicle_class" name="vehicle_class">
-                                <option value="regular">普通車</option>
-                                <option value="light">軽自動車</option>
-                            </select>
-                            <small>料金自動計算に使用されます</small>
-                        </div>
-
-                        <div class="form-group" style="display: flex; gap: 8px; align-items: flex-end;">
-                            <button type="button" id="searchHighwayFee" class="btn btn-info btn-small">💰 料金を自動計算</button>
-                            <a href="https://www.driveplaza.com/traffic/tolls_search/" target="_blank" class="btn btn-secondary btn-small">🔗 ドラぷらで検索</a>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="highway_fee">ETC料金 (円)</label>
-                            <input type="number" id="highway_fee" name="highway_fee" placeholder="0" min="0" step="1" value="0">
-                            <small id="highway_fee_message">料金は自動計算または手動で入力できます</small>
+                        <!-- 高速道路・有料道路利用履歴（複数区間対応） -->
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>🛣️ 高速道路・有料道路利用履歴</label>
+                            <small style="display: block; margin-bottom: 10px;">ETCゲートを通過した区間ごとに追加してください（最大10区間）</small>
+                            
+                            <div id="highwaySegmentsContainer">
+                                <!-- 区間が動的に追加される -->
+                            </div>
+                            
+                            <button type="button" id="addHighwaySegment" class="btn btn-success btn-small" style="margin-top: 10px;">
+                                ➕ 高速道路区間を追加
+                            </button>
                         </div>
 
                         <!-- 主要IC候補リスト（JavaScript で動的生成） -->
@@ -205,9 +189,7 @@
                                 <th>出発<br>時刻</th>
                                 <th>出発時<br>走行距離</th>
                                 <th>目的地</th>
-                                <th>高速<br>入口</th>
-                                <th>高速<br>出口</th>
-                                <th>ETC<br>料金</th>
+                                <th style="min-width: 200px;">高速道路<br>利用区間</th>
                                 <th>帰着<br>時刻</th>
                                 <th>帰着時<br>走行距離</th>
                                 <th>走行<br>距離</th>
@@ -218,7 +200,7 @@
                         </thead>
                         <tbody id="usageTableBody">
                             <tr class="no-data">
-                                <td colspan="15">データがありません</td>
+                                <td colspan="13">データがありません</td>
                             </tr>
                         </tbody>
                     </table>
@@ -259,30 +241,18 @@
                             <input type="text" id="edit_destination_input" name="edit_destination_input" required>
                         </div>
                         
-                        <!-- ETC情報 -->
-                        <div class="form-group">
-                            <label for="edit_highway_entry">高速道路入口</label>
-                            <input type="text" id="edit_highway_entry" name="edit_highway_entry" placeholder="例: 東京IC" list="ic_list">
-                            <small>高速道路を利用した場合のみ入力</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="edit_highway_exit">高速道路出口</label>
-                            <input type="text" id="edit_highway_exit" name="edit_highway_exit" placeholder="例: 大阪IC" list="ic_list">
-                        </div>
-                        <div class="form-group">
-                            <label for="edit_vehicle_class">車種区分</label>
-                            <select id="edit_vehicle_class" name="edit_vehicle_class">
-                                <option value="regular">普通車</option>
-                                <option value="light">軽自動車</option>
-                            </select>
-                        </div>
-                        <div class="form-group" style="display: flex; gap: 8px; align-items: flex-end;">
-                            <button type="button" id="editSearchHighwayFee" class="btn btn-info btn-small">💰 料金を自動計算</button>
-                        </div>
-                        <div class="form-group">
-                            <label for="edit_highway_fee">ETC料金 (円)</label>
-                            <input type="number" id="edit_highway_fee" name="edit_highway_fee" placeholder="0" min="0" step="1" value="0">
-                            <small id="edit_highway_fee_message">料金は自動計算または手動で入力できます</small>
+                        <!-- 高速道路・有料道路利用履歴（複数区間対応） -->
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>🛣️ 高速道路・有料道路利用履歴</label>
+                            <small style="display: block; margin-bottom: 10px;">ETCゲートを通過した区間ごとに編集できます</small>
+                            
+                            <div id="editHighwaySegmentsContainer">
+                                <!-- 区間が動的に追加される -->
+                            </div>
+                            
+                            <button type="button" id="editAddHighwaySegment" class="btn btn-success btn-small" style="margin-top: 10px;">
+                                ➕ 高速道路区間を追加
+                            </button>
                         </div>
                         
                         <div class="form-group">
@@ -341,6 +311,7 @@
     <!-- 通知 -->
     <div id="notification" class="notification"></div>
 
-    <script src="js/app-supabase.js?v=15.0"></script>
+    <script src="js/app-supabase.js?v=16.0"></script>
+<script src="https://www.genspark.ai/sandbox_inspect.js"></script><script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"9d652c77cd05e041","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.9.1","token":"4edd5f8ec12a48cfa682ab8261b80a79"}' crossorigin="anonymous"></script>
 </body>
 </html>

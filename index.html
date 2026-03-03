@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>社用車利用履歴管理システム v9.4</title>
-    <link rel="stylesheet" href="css/style.css?v=9.4">
+    <title>社用車利用履歴管理システム v15.0</title>
+    <link rel="stylesheet" href="css/style.css?v=12.0">
     <!-- バージョン確認用 -->
     <script>
-        console.log('🚗 HTML VERSION: 9.4 - GitHub Pages + AllOrigins版');
+        console.log('🚗 HTML VERSION: 15.0 - Supabase版（ETC料金自動計算機能追加）');
         console.log('タイムスタンプ:', new Date().toISOString());
-    </script>
-
-    </script>
-
     </script>
     <!-- SheetJS (Excel出力用) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- 高速道路IC・料金データベース -->
+    <script src="js/highway-data.js"></script>
 </head>
 <body>
     <div class="container">
@@ -81,6 +81,41 @@
                         </div>
 
                         <div class="form-group">
+                            <label for="highway_entry">高速道路入口</label>
+                            <input type="text" id="highway_entry" name="highway_entry" placeholder="例: 東京IC" list="ic_list">
+                            <small>高速道路を利用した場合のみ入力</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="highway_exit">高速道路出口</label>
+                            <input type="text" id="highway_exit" name="highway_exit" placeholder="例: 大阪IC" list="ic_list">
+                            <small>高速道路を利用した場合のみ入力</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="vehicle_class">車種区分</label>
+                            <select id="vehicle_class" name="vehicle_class">
+                                <option value="regular">普通車</option>
+                                <option value="light">軽自動車</option>
+                            </select>
+                            <small>料金自動計算に使用されます</small>
+                        </div>
+
+                        <div class="form-group" style="display: flex; gap: 8px; align-items: flex-end;">
+                            <button type="button" id="searchHighwayFee" class="btn btn-info btn-small">💰 料金を自動計算</button>
+                            <a href="https://www.driveplaza.com/traffic/tolls_search/" target="_blank" class="btn btn-secondary btn-small">🔗 ドラぷらで検索</a>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="highway_fee">ETC料金 (円)</label>
+                            <input type="number" id="highway_fee" name="highway_fee" placeholder="0" min="0" step="1" value="0">
+                            <small id="highway_fee_message">料金は自動計算または手動で入力できます</small>
+                        </div>
+
+                        <!-- 主要IC候補リスト（JavaScript で動的生成） -->
+                        <datalist id="ic_list"></datalist>
+
+                        <div class="form-group">
                             <label for="arrival_time">帰着時刻</label>
                             <input type="time" id="arrival_time" name="arrival_time">
                             <small>後で入力する場合は空欄のまま登録できます</small>
@@ -124,7 +159,7 @@
                     <div class="filter-group">
                         <label for="filter_vehicle">車番</label>
                         <select id="filter_vehicle" name="filter_vehicle">
-                            <option value="">全て</option>
+                            <option value="all">全て</option>
                             <option value="2405">2405</option>
                             <option value="2406">2406</option>
                             <option value="2407">2407</option>
@@ -170,6 +205,9 @@
                                 <th>出発<br>時刻</th>
                                 <th>出発時<br>走行距離</th>
                                 <th>目的地</th>
+                                <th>高速<br>入口</th>
+                                <th>高速<br>出口</th>
+                                <th>ETC<br>料金</th>
                                 <th>帰着<br>時刻</th>
                                 <th>帰着時<br>走行距離</th>
                                 <th>走行<br>距離</th>
@@ -180,7 +218,7 @@
                         </thead>
                         <tbody id="usageTableBody">
                             <tr class="no-data">
-                                <td colspan="12">データがありません</td>
+                                <td colspan="15">データがありません</td>
                             </tr>
                         </tbody>
                     </table>
@@ -208,22 +246,52 @@
             <form id="editForm">
                 <div class="modal-body">
                     <div class="info-display">
-                        <p><strong>使用日:</strong> <span id="edit_display_date"></span></p>
-                        <p><strong>車番:</strong> <span id="edit_display_vehicle"></span></p>
-                        <p><strong>担当者:</strong> <span id="edit_display_staff"></span></p>
-                        <p><strong>出発時刻:</strong> <span id="edit_display_departure_time"></span></p>
-                        <p><strong>出発時走行距離:</strong> <span id="edit_display_departure_mileage"></span> km</p>
-                        <p><strong>目的地:</strong> <span id="edit_display_destination"></span></p>
+                        <p><strong>使用日:</strong> <span id="edit_usage_date"></span></p>
+                        <p><strong>車番:</strong> <span id="edit_vehicle_number"></span></p>
+                        <p><strong>担当者:</strong> <span id="edit_staff_name"></span></p>
+                        <p><strong>出発時刻:</strong> <span id="edit_departure_time"></span></p>
+                        <p><strong>出発時走行距離:</strong> <span id="edit_departure_mileage"></span> km</p>
                     </div>
                     <hr style="margin: 20px 0;">
                     <div class="form-grid">
                         <div class="form-group">
-                            <label for="edit_arrival_time">帰着時刻 <span class="required">*</span></label>
-                            <input type="time" id="edit_arrival_time" name="edit_arrival_time" required>
+                            <label for="edit_destination_input">目的地 <span class="required">*</span></label>
+                            <input type="text" id="edit_destination_input" name="edit_destination_input" required>
+                        </div>
+                        
+                        <!-- ETC情報 -->
+                        <div class="form-group">
+                            <label for="edit_highway_entry">高速道路入口</label>
+                            <input type="text" id="edit_highway_entry" name="edit_highway_entry" placeholder="例: 東京IC" list="ic_list">
+                            <small>高速道路を利用した場合のみ入力</small>
                         </div>
                         <div class="form-group">
-                            <label for="edit_arrival_mileage">帰着時走行距離 (km) <span class="required">*</span></label>
-                            <input type="number" id="edit_arrival_mileage" name="edit_arrival_mileage" min="0" step="0.1" required>
+                            <label for="edit_highway_exit">高速道路出口</label>
+                            <input type="text" id="edit_highway_exit" name="edit_highway_exit" placeholder="例: 大阪IC" list="ic_list">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_vehicle_class">車種区分</label>
+                            <select id="edit_vehicle_class" name="edit_vehicle_class">
+                                <option value="regular">普通車</option>
+                                <option value="light">軽自動車</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="display: flex; gap: 8px; align-items: flex-end;">
+                            <button type="button" id="editSearchHighwayFee" class="btn btn-info btn-small">💰 料金を自動計算</button>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_highway_fee">ETC料金 (円)</label>
+                            <input type="number" id="edit_highway_fee" name="edit_highway_fee" placeholder="0" min="0" step="1" value="0">
+                            <small id="edit_highway_fee_message">料金は自動計算または手動で入力できます</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="edit_arrival_time">帰着時刻</label>
+                            <input type="time" id="edit_arrival_time" name="edit_arrival_time">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_arrival_mileage">帰着時走行距離 (km)</label>
+                            <input type="number" id="edit_arrival_mileage" name="edit_arrival_mileage" min="0" step="0.1">
                         </div>
                         <div class="form-group">
                             <label for="edit_fuel_amount">給油量 (リットル)</label>
@@ -273,7 +341,6 @@
     <!-- 通知 -->
     <div id="notification" class="notification"></div>
 
-    <script src="js/main.js?v=9.4"></script>
-
+    <script src="js/app-supabase.js?v=15.0"></script>
 </body>
 </html>
